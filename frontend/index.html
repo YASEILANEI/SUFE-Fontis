@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>上财校园助手</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+<style>
+  :root {
+    --bg: #f5f7fa;
+    --card: #ffffff;
+    --primary: #1f4e8c;
+    --primary-light: #e8f0fa;
+    --text: #1a2233;
+    --muted: #66708a;
+    --border: #e2e8f0;
+    --accent: #c8102e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    background: linear-gradient(120deg, #1f4e8c, #2e6cb5);
+    color: #fff;
+    padding: 16px 24px;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.12);
+  }
+  header h1 { font-size: 20px; letter-spacing: 1px; }
+  header .sub { font-size: 13px; opacity: .85; }
+  .stats { margin-left: auto; font-size: 12px; opacity: .9; }
+  main { flex: 1; display: flex; min-height: 0; }
+  aside {
+    width: 260px;
+    background: var(--card);
+    border-right: 1px solid var(--border);
+    padding: 16px;
+    overflow-y: auto;
+  }
+  aside h3 { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .cat {
+    display: flex; justify-content: space-between;
+    padding: 7px 10px; margin-bottom: 6px;
+    border: 1px solid transparent; border-radius: 8px;
+    background: var(--bg); font-size: 13px; cursor: pointer;
+  }
+  .cat:hover { border-color: var(--primary); }
+  .cat.on { border-color: var(--primary); background: var(--primary-light); color: var(--primary); font-weight: 600; }
+  .cat .n { color: var(--muted); font-size: 12px; }
+  .q-btn {
+    display: block; width: 100%; text-align: left;
+    padding: 8px 10px; margin-bottom: 6px;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: #fff; color: var(--text); font-size: 13px; cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .q-btn:hover { border-color: var(--primary); background: var(--primary-light); }
+  .chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #log {
+    flex: 1; overflow-y: auto; padding: 20px 24px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .msg { max-width: 760px; }
+  .msg .bubble {
+    padding: 12px 16px; border-radius: 12px; line-height: 1.7; font-size: 14.5px;
+  }
+  .msg.user { align-self: flex-end; }
+  .msg.user .bubble { background: var(--primary); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.assistant { align-self: flex-start; width: 100%; }
+  .msg.assistant .bubble { background: var(--card); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+  .msg.assistant .bubble :global(ul), .msg.assistant .bubble ul { padding-left: 20px; }
+  .msg.assistant .bubble p { margin: 6px 0; }
+  .msg.assistant .bubble pre {
+    background: #0f172a; color: #e2e8f0; padding: 10px; border-radius: 8px;
+    overflow-x: auto; font-size: 13px;
+  }
+  .src-ref {
+    color: var(--primary); text-decoration: underline; cursor: pointer;
+    font-weight: 600;
+  }
+  .cursor { display: inline-block; width: 7px; background: var(--primary); opacity: .6; animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .sources { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .src-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+    background: var(--bg); max-width: 340px; cursor: pointer; transition: border-color .15s, box-shadow .15s;
+  }
+  .src-card:hover, .src-card.highlight { border-color: var(--primary); box-shadow: 0 2px 8px rgba(31,78,140,.15); }
+  .src-card .t { font-size: 13px; font-weight: 600; color: var(--primary); }
+  .src-card .m { font-size: 12px; color: var(--muted); margin: 3px 0; }
+  .src-card .x { font-size: 12px; color: var(--text); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .src-num { display: inline-block; background: var(--primary); color: #fff; font-size: 11px; border-radius: 6px; padding: 1px 6px; margin-right: 6px; }
+  .error { color: var(--accent); }
+  .composer {
+    border-top: 1px solid var(--border); background: var(--card);
+    padding: 12px 24px; display: flex; gap: 10px;
+  }
+  #input {
+    flex: 1; padding: 12px 14px; border: 1px solid var(--border);
+    border-radius: 10px; font-size: 14px; outline: none; resize: none;
+    font-family: inherit;
+  }
+  #input:focus { border-color: var(--primary); }
+  #send {
+    padding: 0 22px; border: none; border-radius: 10px;
+    background: var(--primary); color: #fff; font-size: 15px; cursor: pointer;
+  }
+  #send:disabled { opacity: .5; cursor: not-allowed; }
+  #send:hover:not(:disabled) { background: #2e6cb5; }
+  .modal-mask {
+    position: fixed; inset: 0; background: rgba(0,0,0,.45);
+    display: none; align-items: center; justify-content: center; z-index: 10;
+  }
+  .modal-mask.open { display: flex; }
+  .modal {
+    width: min(860px, 92vw); max-height: 80vh; background: #fff;
+    border-radius: 12px; overflow: hidden; display: flex; flex-direction: column;
+  }
+  .modal header { padding: 12px 16px; font-size: 15px; }
+  .modal .body { padding: 16px 20px; overflow-y: auto; line-height: 1.8; font-size: 13.5px; white-space: pre-wrap; }
+  .modal .close { background: none; border: none; color: #fff; font-size: 18px; cursor: pointer; }
+  @media (max-width: 720px) { aside { display: none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>上财校园助手</h1>
+  <span class="sub">基于学校官方规章制度的问答智能体</span>
+  <span class="stats" id="stats"></span>
+</header>
+<main>
+  <aside>
+    <h3>知识库分类</h3>
+    <div id="cats"></div>
+    <h3 style="margin-top:16px">常见问题</h3>
+    <div id="qlist"></div>
+  </aside>
+  <section class="chat">
+    <div id="log"></div>
+    <div class="composer">
+      <textarea id="input" rows="1" placeholder="例如：推免需要满足哪些条件？"></textarea>
+      <button id="send">发送</button>
+    </div>
+  </section>
+</main>
+
+<div class="modal-mask" id="modal">
+  <div class="modal">
+    <header>
+      <span id="modal-title">原文</span>
+      <button class="close" onclick="closeModal()">×</button>
+    </header>
+    <div class="body" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const log = $("#log");
+let busy = false;
+let history = [];  // 多轮对话上下文（最近若干轮）
+let activeCategory = "";  // 当前限定的知识库分类，空为全库
+
+marked.setOptions({ breaks: true });
+
+async function init() {
+  try {
+    const r = await fetch("/api/meta");
+    const m = await r.json();
+    $("#stats").textContent = `${m.doc_count} 份文档 · ${m.chunk_count} 条资料${m.vector ? " · 语义检索" : ""}`;
+    $("#cats").innerHTML = m.categories
+      .map((c) => `<div class="cat${activeCategory === c.name ? " on" : ""}" data-cat="${c.name}" onclick="setCat('${c.name.replace(/'/g, "\\'")}')"><span>${c.name}</span><span class="n">${c.count}</span></div>`)
+      .join("");
+    $("#qlist").innerHTML = m.questions
+      .map((q, i) => `<button class="q-btn" onclick="ask('${q.replace(/'/g, "\\'")}')">${i + 1}. ${q}</button>`)
+      .join("");
+  } catch (e) { console.error(e); }
+}
+
+function addMsg(role, text) {
+  const wrap = document.createElement("div");
+  wrap.className = `msg ${role}`;
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  if (role === "assistant") bubble.innerHTML = marked.parse(text || "");
+  else bubble.textContent = text;
+  wrap.appendChild(bubble);
+  log.appendChild(wrap);
+  log.scrollTop = log.scrollHeight;
+  return wrap;
+}
+
+function setCat(name) {
+  activeCategory = activeCategory === name ? "" : name;
+  $("#input").placeholder = activeCategory
+    ? `当前仅在「${activeCategory}」分类下检索（再点分类取消）`
+    : "例如：推免需要满足哪些条件？";
+  document.querySelectorAll("#cats .cat").forEach((el) =>
+    el.classList.toggle("on", el.dataset.cat === activeCategory));
+}
+
+function ask(q) {
+  $("#input").value = q;
+  send();
+}
+
+function handleEvent(ev, data, wrap, state) {
+  const bubble = wrap.querySelector(".bubble");
+  if (ev === "sources") {
+    state.sources = data.sources;
+  } else if (ev === "delta") {
+    state.answer += data.text;
+    bubble.innerHTML = renderAnswer(state.answer) + '<span class="cursor"></span>';
+    log.scrollTop = log.scrollHeight;
+  } else if (ev === "done") {
+    bubble.innerHTML = renderAnswer(state.answer);
+    renderSources(wrap, state);
+    history.push({ role: "user", content: state.question });
+    history.push({ role: "assistant", content: state.answer });
+    log.scrollTop = log.scrollHeight;
+  } else if (ev === "error") {
+    bubble.innerHTML = `<span class="error">${data.message}</span>`;
+  }
+}
+
+function renderAnswer(text) {
+  const html = marked.parse(text);
+  return html.replace(/\[来源(\d+)\]/g,
+    (m, i) => `<a class="src-ref" data-i="${i}">[来源${i}]</a>`);
+}
+
+function renderSources(wrap, state) {
+  if (!state.sources || !state.sources.length) return;
+  const box = document.createElement("div");
+  box.className = "sources";
+  box.innerHTML = state.sources.map((s, i) => `
+    <div class="src-card" data-i="${i + 1}" onclick="openDoc('${s.safe_id}', '${s.title.replace(/'/g, "\\'")}')">
+      <div class="t"><span class="src-num">${i + 1}</span>${s.title}</div>
+      <div class="m">${s.category}${s.heading ? " · " + s.heading : ""}</div>
+      <div class="x">${escapeHtml(s.text)}</div>
+    </div>`).join("");
+  wrap.appendChild(box);
+  box.querySelectorAll(".src-card").forEach((card) => {
+    const i = card.dataset.i;
+    const ref = wrap.querySelector(`.src-ref[data-i="${i}"]`);
+    if (ref) {
+      ref.onclick = (e) => { e.preventDefault(); card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        card.classList.add("highlight"); setTimeout(() => card.classList.remove("highlight"), 2000); };
+    }
+  });
+}
+
+async function send() {
+  const q = $("#input").value.trim();
+  if (!q || busy) return;
+  busy = true;
+  $("#send").disabled = true;
+  $("#input").value = "";
+
+  addMsg("user", q);
+  const wrap = addMsg("assistant", "");
+  const bubble = wrap.querySelector(".bubble");
+  bubble.innerHTML = '<span class="cursor"></span>';
+  const state = { answer: "", sources: [], question: q };
+
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: q, history: history.slice(-8), category: activeCategory }),
+    });
+    if (!res.ok || !res.body) throw new Error("请求失败");
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const parts = buf.split("\n\n");
+      buf = parts.pop();
+      for (const part of parts) {
+        let ev = "message", data = "";
+        for (const line of part.split("\n")) {
+          if (line.startsWith("event:")) ev = line.slice(6).trim();
+          else if (line.startsWith("data:")) data += line.slice(5).trim();
+        }
+        if (data) handleEvent(ev, JSON.parse(data), wrap, state);
+      }
+    }
+  } catch (e) {
+    bubble.innerHTML = `<span class="error">网络错误：${e.message}</span>`;
+  } finally {
+    busy = false;
+    $("#send").disabled = false;
+    $("#input").focus();
+  }
+}
+
+async function openDoc(safeId, title) {
+  try {
+    const r = await fetch(`/api/doc/${encodeURIComponent(safeId)}`);
+    const d = await r.json();
+    $("#modal-title").textContent = title;
+    $("#modal-body").textContent = d.text || d.error || "";
+    $("#modal").classList.add("open");
+  } catch (e) { alert("无法加载原文"); }
+}
+function closeModal() { $("#modal").classList.remove("open"); }
+
+function escapeHtml(s) { return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+$("#send").onclick = send;
+$("#input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+});
+$("#modal").addEventListener("click", (e) => { if (e.target === $("#modal")) closeModal(); });
+
+init();
+</script>
+</body>
+</html>

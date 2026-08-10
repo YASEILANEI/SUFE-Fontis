@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+pymupdf
+python-docx
+pandas
+openpyxl
+xlrd
+jieba
+rank-bm25
+openai

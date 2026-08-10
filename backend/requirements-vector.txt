@@ -1,0 +1,3 @@
+# 可选：向量嵌入依赖（较重，torch 体积大）。
+# 不安装时系统自动降级为 BM25 关键词检索。
+sentence-transformers
