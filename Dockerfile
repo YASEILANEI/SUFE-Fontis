@@ -15,8 +15,7 @@ WORKDIR /app/backend
 # 构建期生成索引（未安装向量依赖时自动降级为 BM25）
 RUN python -m ingest.parse && python -m ingest.chunk && python -m ingest.embed_store
 
-ENV OPENAI_MODEL=dsv4f
-EXPOSE 7860
+EXPOSE 8000
 
-# OPENAI_BASE_URL / OPENAI_API_KEY 通过平台 Secrets 注入
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]
+# OPENAI_BASE_URL / OPENAI_API_KEY / OPENAI_MODEL 通过平台 Secrets 注入
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

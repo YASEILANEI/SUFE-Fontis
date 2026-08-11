@@ -1,0 +1,10 @@
+# 本地开发产物与密钥，禁止进入镜像
+.git
+.gitignore
+backend/.venv
+backend/data
+backend/.env
+**/__pycache__
+**/*.pyc
+backend/tests
+backend/scripts
