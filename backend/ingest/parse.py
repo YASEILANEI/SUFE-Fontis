@@ -83,7 +83,7 @@ def parse_file(path: Path) -> dict | None:
 
     return {
         "id": f"{category}/{path.stem}",
-        "title": path.stem,
+        "title": re.sub(r"^[0-9a-fA-F]{32}", "", path.stem).strip(),
         "category": category,
         "rel_path": rel_path,
         "format": ext.lstrip("."),

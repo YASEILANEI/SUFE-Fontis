@@ -72,4 +72,4 @@ class Retriever:
             combined[cid] = combined.get(cid, 0) + (k - rank)
 
         top = sorted(combined, key=combined.get, reverse=True)[:k]
-        return [self.by_id[cid] for cid in top]
+        return [dict(self.by_id[cid], score=combined[cid]) for cid in top]

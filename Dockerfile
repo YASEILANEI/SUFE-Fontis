@@ -1,4 +1,4 @@
-# 上财校园助手 · Docker 镜像（Hugging Face Space / Render 等均可使用）
+# 金匮问渠 · Docker 镜像（Hugging Face Space / Render 等均可使用）
 # 构建期执行文档解析与索引构建（BM25），运行时只读查询。
 FROM python:3.11-slim
 
