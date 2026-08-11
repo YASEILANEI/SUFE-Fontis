@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections import Counter
 from pathlib import Path
 
@@ -172,6 +173,7 @@ def chat(req: ChatRequest) -> StreamingResponse:
         candidates = list(merged.values())
         chunks = rerank_chunks(base_query, candidates, top_k=6)
     except Exception:
+        logging.getLogger("uvicorn.error").exception("检索失败")
         return StreamingResponse(iter([sse("error", {"message": "检索失败，请稍后重试"})]),
                                  media_type="text/event-stream")
 
@@ -186,6 +188,7 @@ def chat(req: ChatRequest) -> StreamingResponse:
                 yield sse("delta", {"text": delta})
             yield sse("done", None)
         except Exception:
+            logging.getLogger("uvicorn.error").exception("生成回答失败")
             yield sse("error", {"message": "生成回答失败，请稍后重试"})
 
     return StreamingResponse(gen(), media_type="text/event-stream")
