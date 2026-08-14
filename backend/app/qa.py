@@ -1,4 +1,4 @@
-"""LLM 问答：检索片段 + dsv4f（OpenAI 兼容接口）生成带引用回答。"""
+"""LLM 问答：检索片段 + DeepSeek（OpenAI 兼容接口）生成带引用回答。"""
 from __future__ import annotations
 
 import os
@@ -13,7 +13,7 @@ load_dotenv(ROOT / ".env")
 
 BASE_URL = os.getenv("OPENAI_BASE_URL")
 API_KEY = os.getenv("OPENAI_API_KEY")
-MODEL = os.getenv("OPENAI_MODEL", "dsv4f")
+MODEL = os.getenv("OPENAI_MODEL") or "deepseek-chat"
 
 _client: OpenAI | None = None
 
@@ -254,8 +254,16 @@ def stream_answer(chunks: list[dict], question: str, history: list[dict] | None 
         messages=messages,
         stream=True,
         temperature=0.2,
+        max_tokens=1500,  # 限制单次回答长度，控制费用与悬挂时间
+        timeout=60,       # 60s 无数据视为超时，避免连接悬挂
     )
+    seen = False
     for chunk in stream:
+        if not chunk.choices or not chunk.choices[0].delta:
+            continue  # 部分兼容实现流结束时会发空 choices 或空 delta 的 chunk
         delta = chunk.choices[0].delta.content
         if delta:
+            seen = True
             yield delta
+    if not seen:
+        raise RuntimeError("模型未返回任何内容")

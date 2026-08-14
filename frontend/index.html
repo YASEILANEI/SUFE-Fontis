@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>金匮问渠 · SUFE Fontis</title>
 <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/motion@11/dist/motion.min.js"></script>
 <style>
   :root {
@@ -645,7 +646,7 @@
     <div class="composer">
       <div class="composer-inner">
         <div class="box">
-          <textarea id="input" rows="1" placeholder="输入问题，Enter 发送，Shift+Enter 换行"></textarea>
+          <textarea id="input" rows="1" maxlength="500" placeholder="输入问题，Enter 发送，Shift+Enter 换行"></textarea>
           <button id="send" title="发送">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg>
           </button>
@@ -710,7 +711,12 @@ const expandedDocs = {};  // safe_id + 引用区间 -> 全文 HTML
 marked.setOptions({ breaks: true });
 
 function safeMarkdown(text) {
-  return marked.parse(text || "", { mangle: false, headerIds: false });
+  const html = marked.parse(text || "", { mangle: false, headerIds: false });
+  // DOMPurify 清洗 marked 透传的原始 HTML，防 LLM 输出注入脚本（XSS）。
+  // 若 DOMPurify 未加载则回退为纯文本转义，绝不渲染未经净化的 HTML。
+  if (window.DOMPurify) return DOMPurify.sanitize(html);
+  console.warn("DOMPurify 未加载，回答将按纯文本转义渲染");
+  return escapeHtml(html);
 }
 
 /* ---------- 会话存储 ---------- */
@@ -1331,7 +1337,21 @@ async function send(qOverride) {
       bubble.innerHTML = renderAnswer(st.answer, st.sources, refIndexFor(s, st.sources, st.answer)) + '<span class="cursor"></span>';
     }, 40);
   };
-  const pauseGate = () => (st.paused ? new Promise((r) => { st.resumeFn = r; }) : Promise.resolve());
+  let streamDone = false;
+  let idleTimer = null;
+  // 空闲超时：60s 未收到任何数据视为连接悬挂，主动中止（区别于手动停止）
+  const armIdle = () => {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      st.timedOut = true;
+      st.controller.abort();
+    }, 60000);
+  };
+  const pauseGate = () => {
+    if (!st.paused) return Promise.resolve();
+    clearTimeout(idleTimer);  // 暂停期间不计时
+    return new Promise((r) => { st.resumeFn = r; });
+  };
 
   try {
     const res = await fetch("/api/chat", {
@@ -1344,7 +1364,7 @@ async function send(qOverride) {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buf = "";
-  let streamDone = false;
+    armIdle();
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -1378,11 +1398,14 @@ async function send(qOverride) {
           if (getActive() === s) renderChat();
           scrollLog();
         } else if (ev === "error") {
+          // 错误后不再把部分回答当完整消息提交（避免覆盖错误提示）
+          streamDone = true;
           bubble.innerHTML = `<span class="error">${escapeHtml(d.message || "生成失败")}</span>`;
           appendFiles(s);
         }
       }
       await pauseGate();
+      armIdle();
     }
     if (!streamDone && st.answer) {
       bubble.innerHTML = renderAnswer(st.answer, st.sources, refIndexFor(s, st.sources, st.answer));
@@ -1396,7 +1419,10 @@ async function send(qOverride) {
     }
   } catch (e) {
     if (e.name === "AbortError") {
-      if (st.answer) {
+      if (st.timedOut) {
+        bubble.innerHTML = `<span class="error">响应超时，请重试</span>`;
+        appendFiles(s);
+      } else if (st.answer) {
         bubble.innerHTML = renderAnswer(st.answer, st.sources, refIndexFor(s, st.sources, st.answer));
         const msgId = uid();
         s.messages.push({ role: "assistant", content: st.answer, sources: st.sources, citesByDoc: groupCitedByDoc(st.answer, st.sources), id: msgId, ts: Date.now() });
@@ -1413,6 +1439,7 @@ async function send(qOverride) {
       appendFiles(s);
     }
   } finally {
+    if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
     if (st.renderTimer) { clearTimeout(st.renderTimer); st.renderTimer = null; }
     if (st.hintTimer) { clearInterval(st.hintTimer); st.hintTimer = null; }
     if (st.bar) { st.bar.remove(); st.bar = null; }

@@ -47,25 +47,16 @@ uvicorn app.main:app --port 8000
 - `GET /api/doc/{id}` —— 原文全文，`?cite=` 指定引用块号时返回高亮区间
 - `GET /api/doc/{id}/download` —— 下载原始文件
 
-## 部署（Render）
+## 部署（Render，原生构建，无需 Docker）
 
 1. 将本仓库 push 到 GitHub。
-2. 在 <https://render.com> 注册（GitHub 登录）→ **New → Web Service** → 连接该仓库。
-3. 构建：Render 检测到根目录 `Dockerfile` 自动走 Docker 构建，无需 Build Command。
-4. 设置：
-   - **Port**：`8000`（与 Dockerfile 的 CMD 回落值一致）
-   - **Health Check Path**（可选）：`/api/meta`
-5. 在 **Environment** 添加三项：`OPENAI_BASE_URL`、`OPENAI_API_KEY`、`OPENAI_MODEL`。
-6. **Deploy**，构建完成后访问 `https://<service-name>.onrender.com`。
+2. 在 <https://render.com> 注册（GitHub 登录）→ **New → Blueprint** → 选择该仓库。
+3. Render 读取根目录 `render.yaml`（Blueprint），按 `runtime: python` 原生 buildpack 构建，无需 Dockerfile。
+4. 首次创建时在 **Service → Environment** 填写 `render.yaml` 中标记的三项（对应 `sync: false` 变量）：`OPENAI_BASE_URL`、`OPENAI_API_KEY`、`OPENAI_MODEL`。
+5. **Apply** 后自动构建：构建期执行 `render.yaml` 的 `buildCommand` 跑完整 ingest（解析 → 分块 → 建 BM25 索引），启动命令读 `$PORT` 运行 uvicorn。
+6. 构建完成后访问 `https://<service-name>.onrender.com`。
 
-> 注意：Render 容器在美区，需确认 `OPENAI_BASE_URL` 中转地址从美区可访问；免费层实例无流量会休眠，首次访问有冷启动延迟。索引在 Docker 构建期生成并打包进镜像（BM25），更新 `规章制度/` 下的文档后需重新 Deploy 才会重建索引。
-
-### 备选：Hugging Face Space
-
-1. 在 <https://huggingface.co/new-space> 创建 Space，SDK 选择 **Docker**。
-2. 推送本仓库到该 Space（或关联 Git）。
-3. 在 Space Settings → Variables and secrets 添加 `OPENAI_BASE_URL`、`OPENAI_API_KEY`、`OPENAI_MODEL`。
-4. 构建完成后打开 Space 的 Public App 链接即可体验。
+> 注意：Render 实例在海外（美区等），需确认 `OPENAI_BASE_URL` 中转地址从该区域可访问。**opencode.ai 的 `/zen/go/v1` 存在地域限制（仅国内/特定区域 IP 可达），海外访问返回 404 导致"生成回答失败"；请改用官方接口，如 DeepSeek 官方 `https://api.deepseek.com` + `deepseek-chat`。**免费层实例无流量会休眠，首次访问有冷启动延迟。索引在构建期生成并随部署快照保留（BM25），更新 `规章制度/` 下的文档后需重新 Deploy 才会重建索引。
 
 ## 项目结构
 

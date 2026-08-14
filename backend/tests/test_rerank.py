@@ -42,7 +42,7 @@ def _candidates(n):
 
 def test_rerank_reorders_by_llm_output(monkeypatch):
     monkeypatch.setattr(qa, "get_client", lambda: FakeClient([_resp("3 1 2")]))
-    result = qa.rerank_chunks("奖学金条件", _candidates(5), top_k=6)
+    result = qa.rerank_chunks("奖学金条件", _candidates(5), top_k=3)
     assert [c["heading"] for c in result] == ["第3章", "第1章", "第2章"]
 
 
@@ -60,7 +60,7 @@ def test_rerank_falls_back_on_empty_output(monkeypatch):
 
 def test_rerank_ignores_invalid_ids(monkeypatch):
     monkeypatch.setattr(qa, "get_client", lambda: FakeClient([_resp("2 abc 99 1")]))
-    result = qa.rerank_chunks("问题", _candidates(4), top_k=6)
+    result = qa.rerank_chunks("问题", _candidates(4), top_k=3)
     assert [c["heading"] for c in result] == ["第2章", "第1章"]
 
 
@@ -81,4 +81,4 @@ def test_rerank_truncates_long_text():
     long_chunk = {"id": "d", "doc_id": "doc", "heading": "长", "text": "甲" * 500}
     assert qa._RERANK_TEXT_MAX == 220  # 截断上限
     numbered = f"[1] {long_chunk['text'].strip()[:qa._RERANK_TEXT_MAX]}"
-    assert len(numbered) == 1 + 2 + 220  # "[1] " + 220 字
+    assert len(numbered) == 4 + 220  # "[1] "（4 字符）+ 220 字

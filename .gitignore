@@ -9,6 +9,12 @@ __pycache__/
 # 解析产物与向量库（由 ingest 生成）
 backend/data/
 
+# 本地临时目录
+.pip-tmp/
+.venv-tmp/
+.pytest_cache/
+pytest-cache-files-*/
+
 # 系统
 .DS_Store
 Thumbs.db

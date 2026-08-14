@@ -50,4 +50,4 @@ python -m pytest tests/
 - `backend/app/` —— 运行时：`main.py`（路由与 SSE 装配，含首页引导问题 `SUGGESTED_QUESTIONS`）、`qa.py`（系统提示词 + 拼 prompt + 流式生成）、`search.py`（Retriever）、`citations.py`（来源定位）。
 - `frontend/index.html` —— 单文件前端（marked + motion 走 CDN），通过 `/api/meta`、`/api/chat`（SSE）、`/api/doc/{id}`（`?cite=` 高亮）、`/api/doc/{id}/download` 交互，侧栏分类来自 `/api/meta`。
 - `backend/tests/` —— pytest 测试（当前 `test_citations.py`，验证引用定位逻辑）。
-- 部署为 Hugging Face Space（Docker）：`Dockerfile` 在构建期跑完整 ingest 打包进镜像，端口 7860，模型 key 走平台 Secrets。
+- 部署为 Render Web Service（原生 buildpack，无需 Docker）：根目录 `render.yaml`（Blueprint）定义构建与启动命令；构建期在 Render 上跑完整 ingest（parse → chunk → embed_store），启动命令 `uvicorn app.main:app --port $PORT`，模型 key 走 Render Service Environment（`render.yaml` 中 `sync: false` 的变量）。ingest 与运行时均以 `Path(__file__).resolve().parents[2]` 定位仓库根，故 cwd 无关，但 `python -m ingest.*` / `uvicorn app.main:app` 需从 `backend/` 目录执行。

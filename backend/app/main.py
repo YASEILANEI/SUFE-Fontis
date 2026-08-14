@@ -71,6 +71,39 @@ class ChatRequest(BaseModel):
     category: str = ""  # 限定知识库分类检索，空为全库
 
 
+MAX_QUESTION = 500            # 问题最长字符数（防滥用/防超长上下文）
+MAX_CATEGORY = 50             # 分类参数最长字符数
+MAX_HISTORY = 20              # 历史最多携带条数
+MAX_HISTORY_CONTENT = 2000    # 单条历史内容最长字符数
+
+
+def validate_chat_input(question: str, category: str) -> str | None:
+    """校验输入长度，返回错误消息；None 表示通过。question 需已 strip。"""
+    if not question:
+        return "问题不能为空"
+    if len(question) > MAX_QUESTION:
+        return f"问题过长（最多 {MAX_QUESTION} 字）"
+    if len(category) > MAX_CATEGORY:
+        return "分类参数过长"
+    return None
+
+
+def normalize_history(history: list[dict] | None) -> list[dict]:
+    """裁剪历史输入：只保留 user/assistant 消息，单条内容截断，最多保留最近 MAX_HISTORY 条。"""
+    if not history:
+        return []
+    cleaned: list[dict] = []
+    for m in history[-MAX_HISTORY:]:
+        if not isinstance(m, dict):
+            continue
+        role = m.get("role")
+        content = m.get("content")
+        if role not in ("user", "assistant") or not content:
+            continue
+        cleaned.append({"role": role, "content": str(content)[:MAX_HISTORY_CONTENT]})
+    return cleaned
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(FRONTEND)
@@ -157,12 +190,14 @@ def doc(doc_id: str, cite: str = "") -> dict:
 @app.post("/api/chat")
 def chat(req: ChatRequest) -> StreamingResponse:
     question = req.question.strip()
-    if not question:
-        return StreamingResponse(iter([sse("error", {"message": "问题不能为空"})]),
+    error = validate_chat_input(question, req.category)
+    if error:
+        return StreamingResponse(iter([sse("error", {"message": error})]),
                                  media_type="text/event-stream")
+    history = normalize_history(req.history)
 
     try:
-        base_query = build_retrieval_query(req.history, question)
+        base_query = build_retrieval_query(history, question)
         retrieval_query = rewrite_query(base_query)
         # 多路召回：原始词与改写词各检索 top 12 合并去重，避免改写词单路偏科导致召回不全
         merged: dict[str, dict] = {}
@@ -184,7 +219,7 @@ def chat(req: ChatRequest) -> StreamingResponse:
         ]
         yield sse("sources", {"sources": sources})
         try:
-            for delta in stream_answer(chunks, question, req.history):
+            for delta in stream_answer(chunks, question, history):
                 yield sse("delta", {"text": delta})
             yield sse("done", None)
         except Exception:
