@@ -11,7 +11,8 @@ from openai import OpenAI
 ROOT = Path(__file__).resolve().parents[1]  # backend/
 load_dotenv(ROOT / ".env")
 
-BASE_URL = os.getenv("OPENAI_BASE_URL")
+DEFAULT_BASE_URL = "https://api.deepseek.com"
+BASE_URL = os.getenv("OPENAI_BASE_URL") or DEFAULT_BASE_URL
 API_KEY = os.getenv("OPENAI_API_KEY")
 MODEL = os.getenv("OPENAI_MODEL") or "deepseek-chat"
 
@@ -21,9 +22,15 @@ _client: OpenAI | None = None
 def get_client() -> OpenAI:
     global _client
     if _client is None:
-        if not API_KEY or not BASE_URL:
-            raise RuntimeError("未配置 OPENAI_API_KEY / OPENAI_BASE_URL（见 backend/.env.example）")
-        _client = OpenAI(base_url=BASE_URL, api_key=API_KEY)
+        if not API_KEY:
+            raise RuntimeError("未配置 OPENAI_API_KEY（见 backend/.env.example）")
+        kwargs: dict = {"base_url": BASE_URL, "api_key": API_KEY}
+        if "opencode" in BASE_URL:
+            # opencode Zen 网关要求 x-opencode-session 认证头（值即会话 token），
+            # 未显式配置 OPENCODE_SESSION 时默认复用 API key。
+            session = os.getenv("OPENCODE_SESSION") or API_KEY
+            kwargs["default_headers"] = {"x-opencode-session": session}
+        _client = OpenAI(**kwargs)
     return _client
 
 

@@ -52,7 +52,7 @@ uvicorn app.main:app --port 8000
 1. 将本仓库 push 到 GitHub。
 2. 在 <https://render.com> 注册（GitHub 登录）→ **New → Blueprint** → 选择该仓库。
 3. Render 读取根目录 `render.yaml`（Blueprint），按 `runtime: python` 原生 buildpack 构建，无需 Dockerfile。
-4. 首次创建时在 **Service → Environment** 填写 `render.yaml` 中标记的三项（对应 `sync: false` 变量）：`OPENAI_BASE_URL`、`OPENAI_API_KEY`、`OPENAI_MODEL`。
+4. 首次创建时在 **Service → Environment** 填写 `OPENAI_API_KEY`。`render.yaml` 已将 `OPENAI_BASE_URL=https://api.deepseek.com` 和 `OPENAI_MODEL=deepseek-chat` 设为海外部署默认值；如使用其他 OpenAI 兼容服务，可在 Render 中覆盖这两个变量。
 5. **Apply** 后自动构建：构建期执行 `render.yaml` 的 `buildCommand` 跑完整 ingest（解析 → 分块 → 建 BM25 索引），启动命令读 `$PORT` 运行 uvicorn。
 6. 构建完成后访问 `https://<service-name>.onrender.com`。
 
